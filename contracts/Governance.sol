@@ -380,7 +380,7 @@ contract Governance is UpgradeableOwned, BanReasons, IGovernance {
         uint256 creatorPoolId = ballotCreator[_ballotId];
         uint256 targetPoolId = ballotPoolId[_ballotId];
         ballotResult[_ballotId] = result;
-        ballotStatus[_ballotId] == BALLOT_STATUS_FINALIZED;
+        ballotStatus[_ballotId] = BALLOT_STATUS_FINALIZED;
         openCountPerPoolId[creatorPoolId] = openCountPerPoolId[creatorPoolId].sub(1);
         if (result == BALLOT_RESULT_REMOVE) {
             validatorSetContract.removeValidator(
