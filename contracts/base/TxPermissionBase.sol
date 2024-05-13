@@ -351,4 +351,5 @@ contract TxPermissionBase is UpgradeableOwned, ITxPermission {
         return (ALL, false);
     }
 
+    uint256[128] __gap;
 }
