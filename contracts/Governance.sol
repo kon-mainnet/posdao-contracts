@@ -432,4 +432,5 @@ contract Governance is UpgradeableOwned, BanReasons, IGovernance {
         return block.number;
     }
 
+    uint256[128] __gap;
 }

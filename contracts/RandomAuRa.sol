@@ -495,4 +495,6 @@ contract RandomAuRa is UpgradeableOwned, IRandomAuRa {
 
         return true;
     }
+
+    uint256[128] __gap;
 }
