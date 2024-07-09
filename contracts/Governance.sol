@@ -414,11 +414,28 @@ contract Governance is UpgradeableOwned, BanReasons, IGovernance {
 
         uint256 result = BALLOT_RESULT_KEEP;
 
+        // sorting remove , keep, ban => 3! = 6
+        // -------------------
+        // remove, keep, ban
+        // remove, ban, keep
+        // keep, remove , ban
+        // keep, ban, remove
+        // ban, remove, keep
+        // ban, keep, remove
+        // -------------------
+        // > or =
+        // >>, >=, =>, ==
+        // special case exist on A=B>C & A=B=C
+        // keep = ban > remove : might be keep
+        // keep = remove > ban : might be keep
+        // ban = remove > keep : tie, but might be keep (becuase keep > ban - remove)
+        // remove = keep = ban : tie, but might be keep (becuase keep > ban - remove)
+
         if (removeVotesCount > banVotesCount) {
             if (removeVotesCount > keepVotesCount) {
                 result = BALLOT_RESULT_REMOVE;
             }
-        } else {
+        } else { // removeVotesCount <= banVotesCount
             if (banVotesCount > removeVotesCount && banVotesCount > keepVotesCount) {
                 result = BALLOT_RESULT_BAN;
             }
