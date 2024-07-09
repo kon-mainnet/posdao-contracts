@@ -223,6 +223,7 @@ contract Registry is Owned, IMetadataRegistry, IOwnerRegistry, IReverseRegistry 
         onlyOwner
         returns (bool)
     {
+        requie(_amount <= 10000 ether, "should not be exceed more than 10,000 KONET");
         fee = _amount;
         emit FeeChanged(_amount);
         return true;
