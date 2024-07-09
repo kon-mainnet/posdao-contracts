@@ -20,6 +20,8 @@ contract Sacrifice {
 contract BlockRewardAuRaBase is UpgradeableOwned, IBlockRewardAuRa {
     using SafeMath for uint256;
 
+    event ercToNativeBridgeAllowedSet(address bridge, bool allowed);
+
     // =============================================== Storage ========================================================
 
     // WARNING: since this contract is upgradeable, do not remove
@@ -340,12 +342,14 @@ contract BlockRewardAuRaBase is UpgradeableOwned, IBlockRewardAuRa {
 
         for (i = 0; i < _ercToNativeBridgesAllowed.length; i++) {
             _ercToNativeBridgeAllowed[_ercToNativeBridgesAllowed[i]] = false;
+            emit ercToNativeBridgeAllowedSet(_ercToNativeBridgesAllowed[i], false);
         }
 
         _ercToNativeBridgesAllowed = _bridgesAllowed;
 
         for (i = 0; i < _bridgesAllowed.length; i++) {
             _ercToNativeBridgeAllowed[_bridgesAllowed[i]] = true;
+            emit ercToNativeBridgeAllowedSet(_bridgesAllowed[i], true);
         }
     }
 

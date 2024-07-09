@@ -331,17 +331,16 @@ contract Ownable {
 
   /**
    * @dev Allows the current owner to renounce onwership.
-   * @param _newOwner The address to transfer ownership to.
    */
   function renounceOwnership() public onlyOwner {
-      _owner = address(0);
+      owner = address(0);
       pendingOwner = address(0);
-      emit OwnershipTransferred(_owner, address(0));
+      emit OwnershipTransferred(owner, address(0));
   }
 
   /**
    * @dev Allows the current owner to transfer control of the contract to a newOwner.
-   * @param _newOwner The address to transfer ownership to.
+   * @param newOwner The address to transfer ownership to.
    */
   function transferOwnership(address newOwner) public onlyOwner {
       require(address(0) != newOwner, "pendingOwner set to the zero address.");
@@ -350,14 +349,13 @@ contract Ownable {
 
   /**
    * @dev Allows the newOwner to transfer control of the contract to a newOwner.
-   * @param _newOwner The address to transfer ownership to.
    */
   function claimOwnership() public {
       require(msg.sender == pendingOwner, "caller != pending owner");
 
-      _owner = pendingOwner;
+      owner = pendingOwner;
       pendingOwner = address(0);
-      emit OwnershipTransferred(_owner, pendingOwner);
+      emit OwnershipTransferred(owner, pendingOwner);
   }
 
   /**
@@ -788,6 +786,7 @@ contract ERC677MultiBridgeToken is PermittableToken {
 
     event BridgeAdded(address indexed bridge);
     event BridgeRemoved(address indexed bridge);
+    event blockRewardContractSet(address indexed blockRewardContract);
 
     constructor(
         string memory _name,
@@ -879,6 +878,8 @@ contract ERC677BridgeTokenRewardable is ERC677MultiBridgeToken {
     address public blockRewardContract;
     address public stakingContract;
 
+    event stakingContractSet(address indexed stakingContract);
+
     constructor(
         string memory _name,
         string memory _symbol,
@@ -891,12 +892,14 @@ contract ERC677BridgeTokenRewardable is ERC677MultiBridgeToken {
     function setBlockRewardContract(address _blockRewardContract) external onlyOwner {
         require(AddressUtils.isContract(_blockRewardContract));
         blockRewardContract = _blockRewardContract;
+        emit blockRewardContractSet(_blockRewardContract);
     }
 
     function setStakingContract(address _stakingContract) external onlyOwner {
         require(AddressUtils.isContract(_stakingContract));
         require(balanceOf(_stakingContract) == 0);
         stakingContract = _stakingContract;
+        emit stakingContractSet(_stakingContract);
     }
 
     modifier onlyBlockRewardContract() {

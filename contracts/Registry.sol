@@ -223,7 +223,7 @@ contract Registry is Owned, IMetadataRegistry, IOwnerRegistry, IReverseRegistry 
         onlyOwner
         returns (bool)
     {
-        requie(_amount <= 10000 ether, "should not be exceed more than 10,000 KONET");
+        require(_amount <= 10000 ether, "should not be exceed more than 10,000 KONET");
         fee = _amount;
         emit FeeChanged(_amount);
         return true;
@@ -249,7 +249,7 @@ contract Registry is Owned, IMetadataRegistry, IOwnerRegistry, IReverseRegistry 
         require(address(this).balance >= amount, "Address: insufficient balance");
 
         // solhint-disable-next-line avoid-low-level-calls, avoid-call-value
-        (bool success, ) = recipient.call{ value: amount }("");
+        (bool success, ) = recipient.call.value(amount)("");
         require(success, "Address: unable to send value, recipient may have reverted");
     }
 
@@ -260,7 +260,8 @@ contract Registry is Owned, IMetadataRegistry, IOwnerRegistry, IReverseRegistry 
     {
         emit Drained(address(this).balance);
         //msg.sender.transfer(address(this).balance);
-        return sendValue(msg.sender, address(this).balance);
+        sendValue(msg.sender, address(this).balance);
+        return true;
     }
 
     // MetadataRegistry views

@@ -7,6 +7,9 @@ import "../interfaces/ITokenMinter.sol";
 
 
 contract BlockRewardAuRaTokens is BlockRewardAuRaBase, IBlockRewardAuRaTokens {
+    event ercToErcBridgeAllowed(address indexed bridge, bool allowed);
+    event nativeToErcBridgeAllowed(address indexed bridge, bool allowed);
+    event TokenMinterContractSet(address indexed tokenMinterContract);
 
     // =============================================== Storage ========================================================
 
@@ -88,12 +91,14 @@ contract BlockRewardAuRaTokens is BlockRewardAuRaBase, IBlockRewardAuRaTokens {
 
         for (i = 0; i < _ercToErcBridgesAllowed.length; i++) {
             _ercToErcBridgeAllowed[_ercToErcBridgesAllowed[i]] = false;
+            emit ercToErcBridgeAllowed(_ercToErcBridgesAllowed[i], false);
         }
 
         _ercToErcBridgesAllowed = _bridgesAllowed;
 
         for (i = 0; i < _bridgesAllowed.length; i++) {
             _ercToErcBridgeAllowed[_bridgesAllowed[i]] = true;
+            emit ercToErcBridgeAllowed(_bridgesAllowed[i], true);
         }
     }
 
@@ -105,12 +110,14 @@ contract BlockRewardAuRaTokens is BlockRewardAuRaBase, IBlockRewardAuRaTokens {
 
         for (i = 0; i < _nativeToErcBridgesAllowed.length; i++) {
             _nativeToErcBridgeAllowed[_nativeToErcBridgesAllowed[i]] = false;
+            emit nativeToErcBridgeAllowed(_nativeToErcBridgesAllowed[i], false);
         }
 
         _nativeToErcBridgesAllowed = _bridgesAllowed;
 
         for (i = 0; i < _bridgesAllowed.length; i++) {
             _nativeToErcBridgeAllowed[_bridgesAllowed[i]] = true;
+            emit nativeToErcBridgeAllowed(_bridgesAllowed[i], true);
         }
     }
 
@@ -122,6 +129,7 @@ contract BlockRewardAuRaTokens is BlockRewardAuRaBase, IBlockRewardAuRaTokens {
     /// as a minting contract.
     function setTokenMinterContract(ITokenMinter _tokenMinterContract) external onlyOwner onlyInitialized {
         tokenMinterContract = _tokenMinterContract;
+        emit TokenMinterContractSet(address(_tokenMinterContract));
     }
 
     /// @dev Called by the `StakingAuRa.claimReward` function to transfer tokens and native coins

@@ -44,6 +44,8 @@ contract StakingAuRaTokens is IStakingAuRaTokens, StakingAuRaBase {
         uint256 fromPoolId
     );
 
+    event erc677TokenContractUpdate(address newAddress);
+
     // =============================================== Setters ========================================================
 
     /// @dev Withdraws a reward from the specified pool for the specified staking epochs
@@ -206,6 +208,7 @@ contract StakingAuRaTokens is IStakingAuRaTokens, StakingAuRaBase {
         require(_erc677TokenContract != IERC677(0));
         require(erc677TokenContract == IERC677(0));
         erc677TokenContract = _erc677TokenContract;
+        emit erc677TokenContractUpdate(address(_erc677TokenContract));
         require(_thisBalance() == 0);
     }
 

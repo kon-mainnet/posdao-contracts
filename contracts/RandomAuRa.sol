@@ -41,6 +41,8 @@ contract RandomAuRa is UpgradeableOwned, IRandomAuRa {
     /// @dev The address of the `ValidatorSetAuRa` contract.
     IValidatorSetAuRa public validatorSetContract;
 
+    event punishForUnrevealSet(bool punishForUnreveal);
+
     // ============================================== Modifiers =======================================================
 
     /// @dev Ensures the caller is the BlockRewardAuRa contract address.
@@ -148,6 +150,7 @@ contract RandomAuRa is UpgradeableOwned, IRandomAuRa {
     /// @dev Changes the `punishForUnreveal` boolean flag. Can only be called by an owner.
     function setPunishForUnreveal(bool _punishForUnreveal) external onlyOwner {
         punishForUnreveal = _punishForUnreveal;
+        emit punishForUnrevealSet(_punishForUnreveal);
     }
 
     /// @dev Initializes the contract at network startup.

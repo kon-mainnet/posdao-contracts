@@ -253,6 +253,10 @@ contract StakingAuRaBase is UpgradeableOwned, IStakingAuRa {
         uint256 fromPoolId
     );
 
+    event stakingEpochStartBlockSet(uint256 _blockNumber);
+    event candidateMinStakeUpdated(uint256 _candidateMinStake);
+    event delegatorMinStakeUpdated(uint256 _delegatorMinStake);
+
     // ============================================== Modifiers =======================================================
 
     /// @dev Ensures the transaction gas price is not zero.
@@ -455,6 +459,7 @@ contract StakingAuRaBase is UpgradeableOwned, IStakingAuRa {
     /// @param _blockNumber The number of the very first block in the upcoming staking epoch.
     function setStakingEpochStartBlock(uint256 _blockNumber) external onlyValidatorSetContract {
         stakingEpochStartBlock = _blockNumber;
+        emit stakingEpochStartBlockSet(_blockNumber);
     }
 
     /// @dev Moves staking tokens/coins from one pool to another. A staker calls this function when they want
@@ -650,6 +655,7 @@ contract StakingAuRaBase is UpgradeableOwned, IStakingAuRa {
     /// @param _minStake The value of a new limit in Wei.
     function setCandidateMinStake(uint256 _minStake) external onlyOwner onlyInitialized {
         candidateMinStake = _minStake;
+        emit candidateMinStakeUpdated(_minStake);
     }
 
     /// @dev Sets (updates) the limit of the minimum delegator stake (DELEGATOR_MIN_STAKE).
@@ -657,6 +663,7 @@ contract StakingAuRaBase is UpgradeableOwned, IStakingAuRa {
     /// @param _minStake The value of a new limit in Wei.
     function setDelegatorMinStake(uint256 _minStake) external onlyOwner onlyInitialized {
         delegatorMinStake = _minStake;
+        emit delegatorMinStakeUpdated(_minStake);
     }
 
     // =============================================== Getters ========================================================
