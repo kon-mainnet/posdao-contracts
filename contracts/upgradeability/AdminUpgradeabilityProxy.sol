@@ -18,4 +18,12 @@ contract AdminUpgradeabilityProxy is BaseAdminUpgradeabilityProxy, Upgradeabilit
         assert(ADMIN_SLOT == bytes32(uint256(keccak256('eip1967.proxy.admin')) - 1));
         _setAdmin(_admin);
     }
+
+    /**
+     * @dev Only fall back when the sender is not the admin.
+     */
+    function _willFallback() internal {
+    require(msg.sender != _admin(), "Cannot call fallback function from the proxy admin");
+    super._willFallback();
+    }
 }
