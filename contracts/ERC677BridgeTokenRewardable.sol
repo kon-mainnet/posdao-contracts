@@ -304,6 +304,7 @@ contract StandardToken is ERC20, BasicToken {
  */
 contract Ownable {
   address public owner;
+  address public pendingOwner;
 
 
   event OwnershipTransferred(
@@ -329,11 +330,34 @@ contract Ownable {
   }
 
   /**
+   * @dev Allows the current owner to renounce onwership.
+   * @param _newOwner The address to transfer ownership to.
+   */
+  function renounceOwnership() public onlyOwner {
+      _owner = address(0);
+      pendingOwner = address(0);
+      emit OwnershipTransferred(_owner, address(0));
+  }
+
+  /**
    * @dev Allows the current owner to transfer control of the contract to a newOwner.
    * @param _newOwner The address to transfer ownership to.
    */
-  function transferOwnership(address _newOwner) public onlyOwner {
-    _transferOwnership(_newOwner);
+  function transferOwnership(address newOwner) public onlyOwner {
+      require(address(0) != newOwner, "pendingOwner set to the zero address.");
+      pendingOwner = newOwner;
+  }
+
+  /**
+   * @dev Allows the newOwner to transfer control of the contract to a newOwner.
+   * @param _newOwner The address to transfer ownership to.
+   */
+  function claimOwnership() public {
+      require(msg.sender == pendingOwner, "caller != pending owner");
+
+      _owner = pendingOwner;
+      pendingOwner = address(0);
+      emit OwnershipTransferred(_owner, pendingOwner);
   }
 
   /**
