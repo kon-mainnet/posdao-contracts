@@ -19,17 +19,18 @@ contract TxPriority {
     }
 
     BokkyPooBahsRedBlackTreeLibrary.Tree internal _weightsTree; // sorted tree of destination weights
-    
+
     address[] internal _sendersWhitelist; // an array of whitelisted senders
     Destination[] internal _minGasPrices; // an array of min gas price rules
     mapping(address => mapping(bytes4 => uint256)) internal _minGasPriceIndex;
-    
+
     uint256 public weightsCount;
     mapping(uint256 => Destination) public destinationByWeight;
     mapping(address => mapping(bytes4 => uint256)) public weightByDestination;
 
     address public owner;
-    
+    address public pendingOwner;
+
     event PrioritySet(address indexed target, bytes4 indexed fnSignature, uint256 weight);
     event SendersWhitelistSet(address[] whitelist);
     event MinGasPriceSet(address indexed target, bytes4 indexed fnSignature, uint256 minGasPrice);
@@ -50,14 +51,7 @@ contract TxPriority {
         emit OwnershipTransferred(address(0), _owner);
     }
 
-    /// @dev Transfers ownership of the contract to a new account (`_newOwner`).
-    /// Can only be called by the current owner.
-    function transferOwnership(address _newOwner) public onlyOwner {
-        require(_newOwner != address(0), "new owner is the zero address");
-        emit OwnershipTransferred(owner, _newOwner);
-        owner = _newOwner;
-    }
-    
+
     /// @dev Sets transaction destination priority (weight).
     /// The more the weight, the more priority transaction will have.
     /// @param _target The `to` address in transaction. Cannot be 0x0.
@@ -88,7 +82,7 @@ contract TxPriority {
         weightByDestination[_target][_fnSignature] = _weight;
         emit PrioritySet(_target, _fnSignature, _weight);
     }
-    
+
     /// @dev Removes a destination from the priority list.
     /// @param _target The `to` address in transaction.
     /// @param _fnSignature The function signature if the `to` is a contract.
@@ -96,16 +90,16 @@ contract TxPriority {
     function removePriority(address _target, bytes4 _fnSignature) external onlyOwner {
         uint256 foundWeight = weightByDestination[_target][_fnSignature];
         require(foundWeight != 0, "destination does not exist"); // destination should exist
-        
+
         _weightsTree.remove(foundWeight);
-        
+
         delete weightByDestination[_target][_fnSignature];
         delete destinationByWeight[foundWeight];
         weightsCount = weightsCount.sub(1);
 
         emit PrioritySet(_target, _fnSignature, 0);
     }
-    
+
     /// @dev Sets sender whitelist, an array of `from` addresses which have a top priority:
     /// if a whitelisted address sends a transaction, this transaction should be mined before
     /// transactions defined by the `setPriority` function.
@@ -114,7 +108,7 @@ contract TxPriority {
         _sendersWhitelist = _whitelist;
         emit SendersWhitelistSet(_whitelist);
     }
-    
+
     /// @dev Sets an exclusive min gas price for the specified transaction destination.
     /// The defined _minGasPrice for the specified transaction should be used by Ethereum client
     /// instead of the MinGasPrice configured by default for all transactions in the client.
@@ -145,7 +139,7 @@ contract TxPriority {
 
         emit MinGasPriceSet(_target, _fnSignature, _minGasPrice);
     }
-    
+
     /// @dev Removes an exclusive min gas price for the specified transaction destination.
     /// @param _target See description of the `setMinGasPrice` function.
     /// @param _fnSignature See description of the `setMinGasPrice` function.
@@ -167,21 +161,21 @@ contract TxPriority {
             revert("not found");
         }
     }
-    
+
     /// @dev Returns all destinations defined by the `setPriority`.
     /// The returned list is sorted by weight descending.
     function getPriorities() external view returns(Destination[] memory weights) {
         weights = new Destination[](weightsCount);
         uint256 weight = _weightsTree.last();
         uint256 i = 0;
-        
+
         while (weight != 0) {
             require(i < weightsCount);
             weights[i++] = destinationByWeight[weight];
             weight = _weightsTree.prev(weight);
         }
     }
-    
+
     /// @dev Returns the sender whitelist set by the `setSendersWhitelist` function.
     function getSendersWhitelist() external view returns(address[] memory whitelist) {
         whitelist = _sendersWhitelist;
@@ -190,6 +184,25 @@ contract TxPriority {
     /// @dev Returns all destinations defined by the `setMinGasPrice`.
     function getMinGasPrices() external view returns(Destination[] memory prices) {
         prices = _minGasPrices;
+    }
+
+    function renounceOwnership() public onlyOwner {
+        owner = address(0);
+        pendingOwner = address(0);
+        emit OwnershipTransferred(owner, address(0));
+    }
+
+    function transferOwnership(address newOwner) public onlyOwner {
+        require(address(0) != newOwner, "pendingOwner set to the zero address.");
+        pendingOwner = newOwner;
+    }
+
+    function claimOwnership() public {
+        require(msg.sender == pendingOwner, "caller != pending owner");
+
+        owner = pendingOwner;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(owner, pendingOwner);
     }
 
 }
