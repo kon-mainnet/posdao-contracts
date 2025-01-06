@@ -297,6 +297,10 @@ contract Governance is UpgradeableOwned, BanReasons, IGovernance {
             if (keepVotesCount.add(removeVotesCount).add(banVotesCount) >= validatorsLength) {
                 return true;
             }
+            // New criterion: Ensure that at least 2/3 of the validators have voted.
+            if (keepVotesCount.add(removeVotesCount).add(banVotesCount) >= (validatorsLength * 2) / 3) {
+                return true;
+            }
         }
         return false;
     }
