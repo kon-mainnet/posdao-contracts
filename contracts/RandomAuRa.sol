@@ -1,4 +1,5 @@
 pragma solidity 0.5.10;
+// Import necessary interfaces and functionality for upgradeable contracts.
 
 import "./interfaces/IRandomAuRa.sol";
 import "./interfaces/IStakingAuRa.sol";
