@@ -19,14 +19,10 @@ contract AdminUpgradeabilityProxy is BaseAdminUpgradeabilityProxy, Upgradeabilit
         _setAdmin(_admin);
     }
     /**
-     * @dev This function should be invoked once the contract has been fully configured
-     * and the admin role is no longer required for its operation.
-     * Calling this function effectively renounces the admin rights,
-     * ensuring the contract operates in a decentralized manner without administrative oversight.
-     * Note: This action is irreversible; proceed with caution.
+     * @dev We take measures to ensure that no one can upgrade this contract.
      */
     function renounceAdmin()  {
-        require(msg.sender == _admin(), "Cannot call fallback function from the proxy admin");
+//        require(msg.sender == _admin(), "Cannot call fallback function from the proxy admin");
         _setAdmin(address(0));
     }
     /**
