@@ -89,7 +89,7 @@ contract StakingAuRaTokens is IStakingAuRaTokens, StakingAuRaBase {
             require(epoch < stakingEpoch);
 
             if (rewardWasTaken[poolId][delegatorOrZero][epoch]) continue;
-            
+
             RewardAmounts memory reward;
 
             if (_poolStakingAddress != staker) { // this is a delegator
@@ -267,13 +267,13 @@ contract StakingAuRaTokens is IStakingAuRaTokens, StakingAuRaBase {
                     poolId,
                     _staker
                 );
-                
+
                 firstLastEpoch[0] = _stakingEpochs[i] + 1; // firstEpoch = ...
 
-                (reward.tokenAmount, reward.nativeAmount) = 
+                (reward.tokenAmount, reward.nativeAmount) =
                     blockRewardContract.getDelegatorReward(delegatorStake, _stakingEpochs[i], poolId);
             } else { // this is a validator
-                (reward.tokenAmount, reward.nativeAmount) = 
+                (reward.tokenAmount, reward.nativeAmount) =
                     blockRewardContract.getValidatorReward(_stakingEpochs[i], poolId);
             }
 
@@ -290,9 +290,12 @@ contract StakingAuRaTokens is IStakingAuRaTokens, StakingAuRaBase {
     /// @param _to The target address to send amount to.
     /// @param _amount The amount to send.
     function _sendWithdrawnStakeAmount(address payable _to, uint256 _amount) internal gasPriceIsValid onlyInitialized {
-        require(erc677TokenContract != IERC677(0));
-        require(erc677TokenContract.transfer(_to, _amount));
+        require(erc677TokenContract != IERC677(address(0)), "Invalid token contract");
+        require(_amount > 0, "Amount must be greater than zero");
+
+        require(lastChangeBlock != _getCurrentBlockNumber(), "Withdrawal already processed this block");
         lastChangeBlock = _getCurrentBlockNumber();
+        require(erc677TokenContract.transfer(_to, _amount), "Token transfer failed");
     }
 
     /// @dev The internal function used by the `stake` and `addPool` functions.

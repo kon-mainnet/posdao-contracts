@@ -74,7 +74,7 @@ contract StakingAuRaCoins is StakingAuRaBase {
             require(epoch < stakingEpoch);
 
             if (rewardWasTaken[poolId][delegatorOrZero][epoch]) continue;
-            
+
             uint256 reward;
 
             if (_poolStakingAddress != staker) { // this is a delegator
@@ -172,18 +172,17 @@ contract StakingAuRaCoins is StakingAuRaBase {
     }
 
     // ============================================== Internal ========================================================
-
     /// @dev Sends coins from this contract to the specified address.
     /// @param _to The target address to send amount to.
     /// @param _amount The amount to send.
     function _sendWithdrawnStakeAmount(address payable _to, uint256 _amount) internal gasPriceIsValid onlyInitialized {
+        require(_amount > 0, "Amount must be greater than zero");
+
+        require(address(this).balance >= _amount, "Insufficient contract balance");
+        lastChangeBlock = _getCurrentBlockNumber();
         if (!_to.send(_amount)) {
-            // We use the `Sacrifice` trick to be sure the coins can be 100% sent to the receiver.
-            // Otherwise, if the receiver is a contract which has a revert in its fallback function,
-            // the sending will fail.
             (new Sacrifice).value(_amount)(_to);
         }
-        lastChangeBlock = _getCurrentBlockNumber();
     }
 
     /// @dev The internal function used by the `stake` and `addPool` functions.
