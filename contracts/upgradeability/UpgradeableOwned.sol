@@ -12,7 +12,7 @@ contract UpgradeableOwned is UpgradeabilityAdmin {
     /// @dev Storage slot for the operational owner address, separate from the proxy admin slot.
     /// Value: keccak256("konet.proxy.owner") - 1
     bytes32 internal constant OWNER_SLOT =
-        0x02016836a56b71f0d02689e69e326f4f4c1b9057164ef592671cf0d37c8040c0;
+        bytes32(uint256(keccak256("konet.proxy.owner")) - 1);
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
