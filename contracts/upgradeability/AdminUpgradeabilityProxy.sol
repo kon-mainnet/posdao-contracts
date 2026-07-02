@@ -18,13 +18,19 @@ contract AdminUpgradeabilityProxy is BaseAdminUpgradeabilityProxy, Upgradeabilit
         assert(ADMIN_SLOT == bytes32(uint256(keccak256('eip1967.proxy.admin')) - 1));
         _setAdmin(_admin);
     }
+
+    /// @dev Emitted when the admin renounces their role.
+    event AdminRenounced(address indexed previousAdmin);
+
     /**
-     * @dev We take measures to ensure that no one can upgrade this contract.
+     * @dev Renounces admin rights, setting admin to address(0).
+     * Can only be called by the current admin.
      */
-    function renounceAdmin()  {
-//        require(msg.sender == _admin(), "Cannot call fallback function from the proxy admin");
+    function renounceAdmin() external ifAdmin {
+        emit AdminRenounced(_admin());
         _setAdmin(address(0));
     }
+
     /**
      * @dev Only fall back when the sender is not the admin.
      */
