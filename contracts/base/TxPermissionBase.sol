@@ -91,6 +91,7 @@ contract TxPermissionBase is UpgradeableOwned, ITxPermission {
         }
         certifierContract = ICertifier(_certifier);
         validatorSetContract = IValidatorSetAuRa(_validatorSet);
+        _setOwner(_admin());
     }
 
     /// @dev Adds the address for which transactions of any type must be allowed.

@@ -57,6 +57,7 @@ contract Certifier is UpgradeableOwned, ICertifier {
             _certify(_certifiedAddresses[i]);
         }
         validatorSetContract = IValidatorSetAuRa(_validatorSet);
+        _setOwner(_admin());
     }
 
     /// @dev Allows the specified addresses to use a zero gas price for their transactions.

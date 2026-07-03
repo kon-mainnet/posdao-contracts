@@ -389,6 +389,7 @@ contract StakingAuRaBase is UpgradeableOwned, IStakingAuRa {
         stakingEpochStartBlock = _stakingEpochStartBlock;
         stakeWithdrawDisallowPeriod = _stakeWithdrawDisallowPeriod;
         lastChangeBlock = _getCurrentBlockNumber();
+        _setOwner(_admin());
     }
 
     /// @dev Makes initial validator stakes. Can only be called by the owner

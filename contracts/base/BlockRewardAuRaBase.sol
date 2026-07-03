@@ -224,6 +224,7 @@ contract BlockRewardAuRaBase is UpgradeableOwned, IBlockRewardAuRa {
         validatorSetContract = IValidatorSetAuRa(_validatorSet);
         validatorMinRewardPercent[0] = VALIDATOR_MIN_REWARD_PERCENT;
         _prevBlockRewardContract = IBlockRewardAuRa(_prevBlockReward);
+        _setOwner(_admin());
     }
 
     /// @dev Called by the validator's node when producing and closing a block,

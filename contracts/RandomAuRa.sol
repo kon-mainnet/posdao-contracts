@@ -176,6 +176,7 @@ contract RandomAuRa is UpgradeableOwned, IRandomAuRa {
         collectRoundLength = _collectRoundLength;
         validatorSetContract = IValidatorSetAuRa(_validatorSet);
         punishForUnreveal = _punishForUnreveal;
+        _setOwner(_admin());
     }
 
     /// @dev Checks whether the current validators at the end of each collection round revealed their numbers,

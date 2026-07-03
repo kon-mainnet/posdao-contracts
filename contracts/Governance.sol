@@ -138,6 +138,7 @@ contract Governance is UpgradeableOwned, BanReasons, IGovernance {
         require(validatorSetContract == IValidatorSetAuRa(0));
         require(_validatorSetContract != address(0));
         validatorSetContract = IValidatorSetAuRa(_validatorSetContract);
+        _setOwner(_admin());
     }
 
     /// @dev Creates a new ballot.
