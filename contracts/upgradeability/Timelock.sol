@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity 0.5.10;
 
 contract Timelock {
     uint256 public constant MINIMUM_DELAY = 48 hours;
@@ -26,7 +25,7 @@ contract Timelock {
         _;
     }
 
-    constructor(address _admin, uint256 _delay) {
+    constructor(address _admin, uint256 _delay) public {
         require(_delay >= MINIMUM_DELAY, "Timelock: delay too short");
         require(_delay <= MAXIMUM_DELAY, "Timelock: delay too long");
         admin = _admin;
@@ -53,8 +52,11 @@ contract Timelock {
     }
 
     function queueTransaction(
-        address target, uint256 value, string calldata signature,
-        bytes calldata data, uint256 eta
+        address target,
+        uint256 value,
+        string calldata signature,
+        bytes calldata data,
+        uint256 eta
     ) external onlyAdmin returns (bytes32) {
         require(eta >= _getBlockTimestamp() + delay, "Timelock: eta too early");
         bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
@@ -64,8 +66,11 @@ contract Timelock {
     }
 
     function cancelTransaction(
-        address target, uint256 value, string calldata signature,
-        bytes calldata data, uint256 eta
+        address target,
+        uint256 value,
+        string calldata signature,
+        bytes calldata data,
+        uint256 eta
     ) external onlyAdmin {
         bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
         queuedTransactions[txHash] = false;
@@ -73,8 +78,11 @@ contract Timelock {
     }
 
     function executeTransaction(
-        address target, uint256 value, string calldata signature,
-        bytes calldata data, uint256 eta
+        address target,
+        uint256 value,
+        string calldata signature,
+        bytes calldata data,
+        uint256 eta
     ) external payable onlyAdmin returns (bytes memory) {
         bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
         require(queuedTransactions[txHash], "Timelock: tx not queued");
@@ -90,7 +98,8 @@ contract Timelock {
             callData = abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
         }
 
-        (bool success, bytes memory result) = target.call{value: value}(callData);
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory result) = address(target).call.value(value)(callData);
         require(success, "Timelock: execution failed");
 
         emit ExecuteTransaction(txHash, target, value, signature, data, eta);
