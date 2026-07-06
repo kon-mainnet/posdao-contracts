@@ -149,8 +149,9 @@ Once flattened, the contracts are available in the `flat` directory.
 
 The reference (and audit-scope) initialization path is **genesis + `InitializerAuRa`**
 (`block.number == 0`). At genesis the `initialize()` block-number guard is bypassed and
-`InitializerAuRa` passes an explicit operational owner to every contract, so the issue2
-admin/owner separation (`_owner != _admin()`) is satisfied by construction. CON-01 /
+`InitializerAuRa` passes an explicit operational owner to the owner-managed contracts
+affected by issue2, so the issue2 admin/owner separation (`_owner != _admin()`) is
+satisfied by construction. CON-01 /
 GLOBAL-01 / issue2 deploy correctness should be judged against this path.
 
 `scripts/deploy_for_xdai.js` is a **legacy one-off live-chain script and is NOT part of
