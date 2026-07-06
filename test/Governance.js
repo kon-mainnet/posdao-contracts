@@ -78,14 +78,14 @@ contract('Governance', async accounts => {
       120992, // _stakingEpochDuration
       9186425, // _stakingEpochStartBlock
       4332 // _stakeWithdrawDisallowPeriod
-    ).should.be.fulfilled;
+    , owner).should.be.fulfilled;
     await stakingAuRa.setCurrentBlockNumber(currentBlockNumber).should.be.fulfilled;
     await stakingAuRa.setStakingEpoch(1).should.be.fulfilled;
     await stakingAuRa.setValidatorSetAddress(owner).should.be.fulfilled;
     await stakingAuRa.setStakingEpochStartBlock(9186425+120992).should.be.fulfilled;
     await stakingAuRa.setValidatorSetAddress(validatorSetAuRa.address).should.be.fulfilled;
     // Initialize Governance
-    await governance.initialize(validatorSetAuRa.address);
+    await governance.initialize(validatorSetAuRa.address, owner);
     await governance.setCurrentBlockNumber(currentBlockNumber).should.be.fulfilled;
   });
 

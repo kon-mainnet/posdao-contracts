@@ -87,7 +87,7 @@ contract('BlockRewardAuRa', async accounts => {
         STAKING_EPOCH_DURATION, // _stakingEpochDuration
         STAKING_EPOCH_START_BLOCK, // _stakingEpochStartBlock
         STAKE_WITHDRAW_DISALLOW_PERIOD // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       candidateMinStake = await stakingAuRa.candidateMinStake.call();
       delegatorMinStake = await stakingAuRa.delegatorMinStake.call();
@@ -96,14 +96,14 @@ contract('BlockRewardAuRa', async accounts => {
       await blockRewardAuRa.initialize(
         validatorSetAuRa.address,
         '0x0000000000000000000000000000000000000000'
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       // Initialize RandomAuRa
       await randomAuRa.initialize(
         COLLECT_ROUND_LENGTH,
         validatorSetAuRa.address,
         true
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       // Deploy ERC677 contract
       erc677Token = await ERC677BridgeTokenRewardable.new("STAKE", "STAKE", 18, 100, {from: owner});
@@ -442,7 +442,7 @@ contract('BlockRewardAuRa', async accounts => {
         STAKING_EPOCH_DURATION, // _stakingEpochDuration
         STAKING_EPOCH_START_BLOCK, // _stakingEpochStartBlock
         STAKE_WITHDRAW_DISALLOW_PERIOD // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       candidateMinStake = await stakingAuRa.candidateMinStake.call();
       delegatorMinStake = await stakingAuRa.delegatorMinStake.call();
@@ -451,7 +451,7 @@ contract('BlockRewardAuRa', async accounts => {
       await blockRewardAuRa.initialize(
         validatorSetAuRa.address,
         '0x0000000000000000000000000000000000000000'
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       stakeTokenInflationRate = await blockRewardAuRa.STAKE_TOKEN_INFLATION_RATE.call();
 
@@ -460,7 +460,7 @@ contract('BlockRewardAuRa', async accounts => {
         COLLECT_ROUND_LENGTH,
         validatorSetAuRa.address,
         true
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       // Start the network
       await setCurrentBlockNumber(STAKING_EPOCH_START_BLOCK);

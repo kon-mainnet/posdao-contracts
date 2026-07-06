@@ -85,7 +85,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       // Deploy ERC677 contract
       erc677Token = await ERC677BridgeTokenRewardable.new("STAKE", "STAKE", 18, 100, {from: owner});
@@ -350,7 +350,7 @@ contract('StakingAuRa', async accounts => {
         76, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         10 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       await stakingAuRa.setValidatorSetAddress(owner).should.be.fulfilled;
 
@@ -431,14 +431,14 @@ contract('StakingAuRa', async accounts => {
       await blockRewardAuRa.initialize(
         validatorSetAuRa.address,
         '0x0000000000000000000000000000000000000000'
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       // Initialize RandomAuRa
       await randomAuRa.initialize(
         114, // _collectRoundLength
         validatorSetAuRa.address,
         true
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       // Initialize StakingAuRa
       await stakingAuRa.initialize(
@@ -450,7 +450,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       // Start the network
       await setCurrentBlockNumber(1);
@@ -2013,7 +2013,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
     });
 
     it('should add validator pool to the poolsToBeElected list', async () => {
@@ -2110,7 +2110,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
       new BN(120954).should.be.bignumber.equal(
         await stakingAuRa.stakingEpochDuration.call()
       );
@@ -2155,7 +2155,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.rejectedWith(ERROR_MSG);
+      , owner).should.be.rejectedWith(ERROR_MSG);
     });
     it('should fail if delegatorMinStake is zero', async () => {
       await stakingAuRa.initialize(
@@ -2167,7 +2167,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.rejectedWith(ERROR_MSG);
+      , owner).should.be.rejectedWith(ERROR_MSG);
     });
     it('should fail if candidateMinStake is zero', async () => {
       await stakingAuRa.initialize(
@@ -2179,7 +2179,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.rejectedWith(ERROR_MSG);
+      , owner).should.be.rejectedWith(ERROR_MSG);
     });
     it('should fail if already initialized', async () => {
       await stakingAuRa.initialize(
@@ -2191,7 +2191,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
       await stakingAuRa.initialize(
         validatorSetAuRa.address, // _validatorSetContract
         '0x0000000000000000000000000000000000000000', // _governanceContract
@@ -2201,7 +2201,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.rejectedWith(ERROR_MSG);
+      , owner).should.be.rejectedWith(ERROR_MSG);
     });
     it('should fail if stakingEpochDuration is 0', async () => {
       await stakingAuRa.initialize(
@@ -2213,7 +2213,7 @@ contract('StakingAuRa', async accounts => {
         0, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.rejectedWith(ERROR_MSG);
+      , owner).should.be.rejectedWith(ERROR_MSG);
     });
     it('should fail if stakeWithdrawDisallowPeriod is 0', async () => {
       await stakingAuRa.initialize(
@@ -2225,7 +2225,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         0 // _stakeWithdrawDisallowPeriod
-      ).should.be.rejectedWith(ERROR_MSG);
+      , owner).should.be.rejectedWith(ERROR_MSG);
     });
     it('should fail if stakeWithdrawDisallowPeriod >= stakingEpochDuration', async () => {
       await stakingAuRa.initialize(
@@ -2237,7 +2237,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         120954 // _stakeWithdrawDisallowPeriod
-      ).should.be.rejectedWith(ERROR_MSG);
+      , owner).should.be.rejectedWith(ERROR_MSG);
       await stakingAuRa.initialize(
         validatorSetAuRa.address, // _validatorSetContract
         '0x0000000000000000000000000000000000000000', // _governanceContract
@@ -2247,7 +2247,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
     });
     it('should fail if some pool id is 0', async () => {
       initialPoolIds[0] = 0;
@@ -2260,7 +2260,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.rejectedWith(ERROR_MSG);
+      , owner).should.be.rejectedWith(ERROR_MSG);
     });
   });
 
@@ -2283,7 +2283,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       // Deploy ERC677 contract
       erc677Token = await ERC677BridgeTokenRewardable.new("STAKE", "STAKE", 18, 100, {from: owner});
@@ -2385,7 +2385,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       candidateMinStake = await stakingAuRa.candidateMinStake.call();
       delegatorMinStake = await stakingAuRa.delegatorMinStake.call();
@@ -2583,7 +2583,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       candidateMinStake = await stakingAuRa.candidateMinStake.call();
       delegatorMinStake = await stakingAuRa.delegatorMinStake.call();
@@ -2716,7 +2716,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
       await stakingAuRa.setCurrentBlockNumber(100).should.be.fulfilled;
       await validatorSetAuRa.setCurrentBlockNumber(100).should.be.fulfilled;
     });
@@ -2812,7 +2812,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
       await stakingAuRa.setCurrentBlockNumber(100).should.be.fulfilled;
     });
 
@@ -2873,7 +2873,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       await stakingAuRa.setCurrentBlockNumber(100).should.be.fulfilled;
 
@@ -2910,7 +2910,7 @@ contract('StakingAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       candidateMinStake = await stakingAuRa.candidateMinStake.call();
       delegatorMinStake = await stakingAuRa.delegatorMinStake.call();
@@ -3072,7 +3072,7 @@ contract('StakingAuRa', async accounts => {
       (await stakingAuRa.stakingEpoch.call()).should.be.bignumber.equal(new BN(1));
 
       // Finalize a new validator set
-      await blockRewardAuRa.initialize(validatorSetAuRa.address, '0x0000000000000000000000000000000000000000').should.be.fulfilled;
+      await blockRewardAuRa.initialize(validatorSetAuRa.address, '0x0000000000000000000000000000000000000000', owner).should.be.fulfilled;
       await validatorSetAuRa.emitInitiateChange().should.be.fulfilled;
       await validatorSetAuRa.finalizeChange({from: owner}).should.be.fulfilled;
 

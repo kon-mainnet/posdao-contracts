@@ -146,7 +146,7 @@ contract('ValidatorSetAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       // Deploy ERC677 contract
       const erc677Token = await ERC677BridgeTokenRewardable.new("STAKE", "STAKE", 18, 100, {from: owner});
@@ -190,7 +190,7 @@ contract('ValidatorSetAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
       (await stakingAuRa.getPoolsToBeRemoved.call()).should.be.deep.equal([
         initialPoolIds[1],
         initialPoolIds[2]
@@ -242,7 +242,7 @@ contract('ValidatorSetAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
 
       // Set `initiateChangeAllowed` boolean flag to `true`
       await validatorSetAuRa.setCurrentBlockNumber(1).should.be.fulfilled;
@@ -288,7 +288,7 @@ contract('ValidatorSetAuRa', async accounts => {
       await validatorSetAuRa.emitInitiateChange().should.be.rejectedWith(ERROR_MSG);
     });
     it('shouldn\'t emit InitiateChange event if an empty pending validators array was queued', async () => {
-      await blockRewardAuRa.initialize(validatorSetAuRa.address, '0x0000000000000000000000000000000000000000').should.be.fulfilled;
+      await blockRewardAuRa.initialize(validatorSetAuRa.address, '0x0000000000000000000000000000000000000000', owner).should.be.fulfilled;
       await validatorSetAuRa.emitInitiateChange().should.be.fulfilled;
       await validatorSetAuRa.setCurrentBlockNumber(120980).should.be.fulfilled;
       await validatorSetAuRa.finalizeChange({from: owner}).should.be.fulfilled;
@@ -520,7 +520,7 @@ contract('ValidatorSetAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
       await stakingAuRa.setCurrentBlockNumber(120954).should.be.fulfilled;
       await validatorSetAuRa.setCurrentBlockNumber(120954).should.be.fulfilled;
     });
@@ -648,7 +648,7 @@ contract('ValidatorSetAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
       await stakingAuRa.setValidatorSetAddress(validatorSetAuRa.address).should.be.fulfilled;
 
       const stakeUnit = new BN(web3.utils.toWei('1', 'ether'));
@@ -765,7 +765,7 @@ contract('ValidatorSetAuRa', async accounts => {
       // Generate a random seed
       (await randomAuRa.currentSeed.call()).should.be.bignumber.equal(new BN(0));
       await randomAuRa.setCurrentBlockNumber(0).should.be.fulfilled;
-      await randomAuRa.initialize(114, validatorSetAuRa.address, true).should.be.fulfilled;
+      await randomAuRa.initialize(114, validatorSetAuRa.address, true, owner).should.be.fulfilled;
       let secretNumbers = [];
       let seed = 0;
       for (let i = 0; i < initialValidators.length; i++) {
@@ -833,7 +833,7 @@ contract('ValidatorSetAuRa', async accounts => {
         120954, // _stakingEpochDuration
         0, // _stakingEpochStartBlock
         4320 // _stakeWithdrawDisallowPeriod
-      ).should.be.fulfilled;
+      , owner).should.be.fulfilled;
       await stakingAuRa.setValidatorSetAddress(validatorSetAuRa.address).should.be.fulfilled;
 
       const stakingAddresses = accounts.slice(7, 25 + 1); // accounts[7...25]
@@ -903,7 +903,7 @@ contract('ValidatorSetAuRa', async accounts => {
       // Generate a random seed
       (await randomAuRa.currentSeed.call()).should.be.bignumber.equal(new BN(0));
       await randomAuRa.setCurrentBlockNumber(0).should.be.fulfilled;
-      await randomAuRa.initialize(114, validatorSetAuRa.address, true).should.be.fulfilled;
+      await randomAuRa.initialize(114, validatorSetAuRa.address, true, owner).should.be.fulfilled;
       let secretNumbers = [];
       let seed = 0;
       for (let i = 0; i < initialValidators.length; i++) {
