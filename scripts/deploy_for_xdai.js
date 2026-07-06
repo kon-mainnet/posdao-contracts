@@ -1,3 +1,38 @@
+// =============================================================================
+// LEGACY / NON-FUNCTIONAL — one-off live-chain deploy script (xDai / POA).
+//
+// This script is NOT the reference deploy flow for the current codebase and is
+// kept only for historical reference. Do not treat it as the audit-scope deploy
+// path (CON-01 / GLOBAL-01 / issue2).
+//
+// Why it no longer works as written:
+//   * UPG-01 (transparent proxy admin-block): AdminUpgradeabilityProxy._willFallback()
+//     reverts ("Cannot call fallback function from the proxy admin") whenever the
+//     proxy admin calls an implementation function through the fallback. This script
+//     uses a single key as proxy admin == operational owner == tx signer, then calls
+//     initialize() on the proxy via the fallback — so the very first initialize()
+//     reverts. This is true independently of issue2.
+//   * issue2 (admin/owner separation): initialize() now takes an explicit operational
+//     owner and enforces `_owner != _admin()`. A single-key setup (admin == owner)
+//     cannot satisfy this, and the initialize signatures here are outdated.
+//   * On a live chain (block.number > 0) the initialize guard
+//     `block.number == 0 || msg.sender == _admin()` requires the caller to be the
+//     admin — but the admin is exactly who the transparent proxy blocks from the
+//     fallback. Net result: initialize is not reachable via the fallback on a live
+//     chain by any single account.
+//
+// What a working live deploy requires (out of scope here — separate PR):
+//   * Separate roles: proxy admin, operational owner (must differ from admin),
+//     and tx signer(s).
+//   * Initialize each proxy via `upgradeToAndCall(impl, initCalldata)` from the
+//     admin (an admin-only path that bypasses the fallback block), passing an
+//     operational owner distinct from the admin.
+//   * Send onlyOwner setup calls from the operational-owner key, not the admin.
+//
+// The audit-scope initialization path is genesis + InitializerAuRa (block.number == 0),
+// which already carries the issue2 `_owner` threading. See README "Deployment".
+// =============================================================================
+
 const assert = require('assert');
 const fetch = require('node-fetch');
 const fs = require('fs');
