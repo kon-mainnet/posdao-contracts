@@ -62,29 +62,17 @@ contract InitializerAuRa {
             _stakingAddresses,
             _firstValidatorIsUnremovable
         );
-        {
-            uint256[] memory _ids = new uint256[](_stakingAddresses.length);
-            for (uint256 i = 0; i < _ids.length; i++) {
-                _ids[i] = IValidatorSetAuRa(_contracts[0]).idByStakingAddress(_stakingAddresses[i]);
-            }
-            IStakingAuRa(_contracts[3]).initialize(
-                _contracts[0], // _validatorSetContract
-                _contracts[6], // _governanceContract
-                _ids,
-                _delegatorMinStake,
-                _candidateMinStake,
-                _stakingEpochDuration,
-                _stakingEpochStartBlock,
-                _stakeWithdrawDisallowPeriod
-            );
-        }
-        IBlockRewardAuRa(_contracts[1]).initialize(_contracts[0], address(0));
-        IRandomAuRa(_contracts[2]).initialize(_collectRoundLength, _contracts[0], true);
-        address[] memory permittedAddresses = new address[](1);
-        permittedAddresses[0] = _owner;
-        ITxPermission(_contracts[4]).initialize(permittedAddresses, _contracts[5], _contracts[0]);
-        ICertifier(_contracts[5]).initialize(permittedAddresses, _contracts[0]);
-        IGovernance(_contracts[6]).initialize(_contracts[0]);
+        // Extracted into a private function (and the numeric params packed into a fixed array)
+        // to keep the stack within Solidity 0.5.x limits after adding the operational owner arg.
+        uint256[5] memory _stakingParams;
+        _stakingParams[0] = _delegatorMinStake;
+        _stakingParams[1] = _candidateMinStake;
+        _stakingParams[2] = _stakingEpochDuration;
+        _stakingParams[3] = _stakingEpochStartBlock;
+        _stakingParams[4] = _stakeWithdrawDisallowPeriod;
+        _initStaking(_contracts, _owner, _stakingAddresses, _stakingParams);
+        // Remaining initializations are extracted to keep the constructor's stack within limits.
+        _initOthers(_contracts, _owner, _collectRoundLength);
         if (block.number > 0) {
             selfdestruct(msg.sender); // this is to clear the state
             // OpenEthereum and Nethermind clients
@@ -92,5 +80,45 @@ contract InitializerAuRa {
             // (see https://github.com/openethereum/openethereum/issues/184)
             // so we call `selfdestruct` here only if we are not in genesis
         }
+    }
+
+    /// @param _stakingParams Packed numeric parameters:
+    ///   [0] _delegatorMinStake, [1] _candidateMinStake, [2] _stakingEpochDuration,
+    ///   [3] _stakingEpochStartBlock, [4] _stakeWithdrawDisallowPeriod.
+    function _initStaking(
+        address[] memory _contracts,
+        address _owner,
+        address[] memory _stakingAddresses,
+        uint256[5] memory _stakingParams
+    ) private {
+        uint256[] memory _ids = new uint256[](_stakingAddresses.length);
+        for (uint256 i = 0; i < _ids.length; i++) {
+            _ids[i] = IValidatorSetAuRa(_contracts[0]).idByStakingAddress(_stakingAddresses[i]);
+        }
+        IStakingAuRa(_contracts[3]).initialize(
+            _contracts[0], // _validatorSetContract
+            _contracts[6], // _governanceContract
+            _ids,
+            _stakingParams[0],
+            _stakingParams[1],
+            _stakingParams[2],
+            _stakingParams[3],
+            _stakingParams[4],
+            _owner
+        );
+    }
+
+    function _initOthers(
+        address[] memory _contracts,
+        address _owner,
+        uint256 _collectRoundLength
+    ) private {
+        IBlockRewardAuRa(_contracts[1]).initialize(_contracts[0], address(0), _owner);
+        IRandomAuRa(_contracts[2]).initialize(_collectRoundLength, _contracts[0], true, _owner);
+        address[] memory permittedAddresses = new address[](1);
+        permittedAddresses[0] = _owner;
+        ITxPermission(_contracts[4]).initialize(permittedAddresses, _contracts[5], _contracts[0], _owner);
+        ICertifier(_contracts[5]).initialize(permittedAddresses, _contracts[0], _owner);
+        IGovernance(_contracts[6]).initialize(_contracts[0], _owner);
     }
 }

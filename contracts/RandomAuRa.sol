@@ -162,7 +162,8 @@ contract RandomAuRa is UpgradeableOwned, IRandomAuRa {
     function initialize(
         uint256 _collectRoundLength, // in blocks
         address _validatorSet,
-        bool _punishForUnreveal
+        bool _punishForUnreveal,
+        address _owner
     ) external {
         require(_getCurrentBlockNumber() == 0 || msg.sender == _admin());
         require(!isInitialized());
@@ -176,7 +177,12 @@ contract RandomAuRa is UpgradeableOwned, IRandomAuRa {
         collectRoundLength = _collectRoundLength;
         validatorSetContract = IValidatorSetAuRa(_validatorSet);
         punishForUnreveal = _punishForUnreveal;
-        _setOwner(_admin());
+        // Operational owner must be distinct from the proxy admin: the transparent proxy
+        // blocks the admin from calling implementation functions, so owner == admin would
+        // permanently lock every `onlyOwner` function.
+        require(_owner != address(0));
+        require(_owner != _admin());
+        _setOwner(_owner);
     }
 
     /// @dev Checks whether the current validators at the end of each collection round revealed their numbers,

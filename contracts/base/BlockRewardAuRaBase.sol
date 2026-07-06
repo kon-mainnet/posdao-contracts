@@ -217,14 +217,19 @@ contract BlockRewardAuRaBase is UpgradeableOwned, IBlockRewardAuRa {
     /// @param _validatorSet The address of the `ValidatorSetAuRa` contract.
     /// @param _prevBlockReward The address of the previous BlockReward contract
     /// (for statistics migration purposes).
-    function initialize(address _validatorSet, address _prevBlockReward) external {
+    function initialize(address _validatorSet, address _prevBlockReward, address _owner) external {
         require(_getCurrentBlockNumber() == 0 || msg.sender == _admin());
         require(!isInitialized());
         require(_validatorSet != address(0));
         validatorSetContract = IValidatorSetAuRa(_validatorSet);
         validatorMinRewardPercent[0] = VALIDATOR_MIN_REWARD_PERCENT;
         _prevBlockRewardContract = IBlockRewardAuRa(_prevBlockReward);
-        _setOwner(_admin());
+        // Operational owner must be distinct from the proxy admin: the transparent proxy
+        // blocks the admin from calling implementation functions, so owner == admin would
+        // permanently lock every `onlyOwner` function.
+        require(_owner != address(0));
+        require(_owner != _admin());
+        _setOwner(_owner);
     }
 
     /// @dev Called by the validator's node when producing and closing a block,

@@ -48,7 +48,8 @@ contract Certifier is UpgradeableOwned, ICertifier {
     /// @param _validatorSet The address of the `ValidatorSetAuRa` contract.
     function initialize(
         address[] calldata _certifiedAddresses,
-        address _validatorSet
+        address _validatorSet,
+        address _owner
     ) external {
         require(block.number == 0 || msg.sender == _admin());
         require(!isInitialized());
@@ -57,7 +58,12 @@ contract Certifier is UpgradeableOwned, ICertifier {
             _certify(_certifiedAddresses[i]);
         }
         validatorSetContract = IValidatorSetAuRa(_validatorSet);
-        _setOwner(_admin());
+        // Operational owner must be distinct from the proxy admin: the transparent proxy
+        // blocks the admin from calling implementation functions, so owner == admin would
+        // permanently lock every `onlyOwner` function.
+        require(_owner != address(0));
+        require(_owner != _admin());
+        _setOwner(_owner);
     }
 
     /// @dev Allows the specified addresses to use a zero gas price for their transactions.

@@ -133,12 +133,17 @@ contract Governance is UpgradeableOwned, BanReasons, IGovernance {
     /// @dev Initializes the contract. Used by the constructor of the `InitializerAuRa` contract, or separately when
     /// initializing not from genesis.
     /// @param _validatorSetContract The address of the `ValidatorSetAuRa` contract.
-    function initialize(address _validatorSetContract) external {
+    function initialize(address _validatorSetContract, address _owner) external {
         require(_getCurrentBlockNumber() == 0 || msg.sender == _admin());
         require(validatorSetContract == IValidatorSetAuRa(0));
         require(_validatorSetContract != address(0));
         validatorSetContract = IValidatorSetAuRa(_validatorSetContract);
-        _setOwner(_admin());
+        // Operational owner must be distinct from the proxy admin: the transparent proxy
+        // blocks the admin from calling implementation functions, so owner == admin would
+        // permanently lock every `onlyOwner` function.
+        require(_owner != address(0));
+        require(_owner != _admin());
+        _setOwner(_owner);
     }
 
     /// @dev Creates a new ballot.

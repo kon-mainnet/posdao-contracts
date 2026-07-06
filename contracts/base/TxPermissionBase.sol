@@ -80,7 +80,8 @@ contract TxPermissionBase is UpgradeableOwned, ITxPermission {
     function initialize(
         address[] calldata _allowed,
         address _certifier,
-        address _validatorSet
+        address _validatorSet,
+        address _owner
     ) external {
         require(block.number == 0 || msg.sender == _admin());
         require(!isInitialized());
@@ -91,7 +92,12 @@ contract TxPermissionBase is UpgradeableOwned, ITxPermission {
         }
         certifierContract = ICertifier(_certifier);
         validatorSetContract = IValidatorSetAuRa(_validatorSet);
-        _setOwner(_admin());
+        // Operational owner must be distinct from the proxy admin: the transparent proxy
+        // blocks the admin from calling implementation functions, so owner == admin would
+        // permanently lock every `onlyOwner` function.
+        require(_owner != address(0));
+        require(_owner != _admin());
+        _setOwner(_owner);
     }
 
     /// @dev Adds the address for which transactions of any type must be allowed.
