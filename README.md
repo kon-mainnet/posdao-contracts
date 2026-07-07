@@ -145,6 +145,31 @@ $ npm run flat
 
 Once flattened, the contracts are available in the `flat` directory.
 
+### Deployment
+
+The reference (and audit-scope) initialization path is **genesis + `InitializerAuRa`**
+(`block.number == 0`). At genesis the `initialize()` block-number guard is bypassed.
+`InitializerAuRa` passes an explicit operational owner to the owner-managed contracts
+affected by issue2, and each affected initializer enforces `_owner != _admin()`, so the
+admin/owner separation is enforced during genesis initialization. CON-01 /
+GLOBAL-01 / issue2 deploy correctness should be judged against this path.
+
+`scripts/deploy_for_xdai.js` is a **legacy one-off live-chain script and is NOT part of
+the audit-scope deploy flow.** It is non-functional against the current transparent-proxy
+code: it uses a single key as proxy admin, operational owner, and tx signer, and calls
+`initialize()` through the proxy fallback. The UPG-01 transparent proxy admin-block
+prevents the admin from reaching implementation functions via the fallback, so the first
+`initialize()` reverts — independently of issue2. issue2 additionally requires the
+operational owner to differ from the proxy admin, which a single-key setup cannot
+satisfy. This script is retained for historical reference only.
+
+A working **live redeploy** (as opposed to genesis) is out of scope for the issue2
+PR and will be handled separately. It requires distinct proxy-admin /
+operational-owner / signer roles. The admin must initialize through
+`upgradeToAndCall(impl, initCalldata)` rather than the proxy fallback, and the
+initCalldata for the issue2-affected owner-managed contracts must include an
+operational owner distinct from the proxy admin.
+
 ## Security Audit
 
 - [Code Assessment of the POSDAO Smart Contracts](https://github.com/poanetwork/posdao-contracts/blob/master/audit/ChainSecurity/report.pdf) by ChainSecurity

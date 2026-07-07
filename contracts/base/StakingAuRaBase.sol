@@ -360,7 +360,8 @@ contract StakingAuRaBase is UpgradeableOwned, IStakingAuRa {
         uint256 _candidateMinStake,
         uint256 _stakingEpochDuration,
         uint256 _stakingEpochStartBlock,
-        uint256 _stakeWithdrawDisallowPeriod
+        uint256 _stakeWithdrawDisallowPeriod,
+        address _owner
     ) external {
         require(_validatorSetContract != address(0));
         require(_initialIds.length > 0);
@@ -389,7 +390,12 @@ contract StakingAuRaBase is UpgradeableOwned, IStakingAuRa {
         stakingEpochStartBlock = _stakingEpochStartBlock;
         stakeWithdrawDisallowPeriod = _stakeWithdrawDisallowPeriod;
         lastChangeBlock = _getCurrentBlockNumber();
-        _setOwner(_admin());
+        // Operational owner must be distinct from the proxy admin: the transparent proxy
+        // blocks the admin from calling implementation functions, so owner == admin would
+        // permanently lock every `onlyOwner` function.
+        require(_owner != address(0));
+        require(_owner != _admin());
+        _setOwner(_owner);
     }
 
     /// @dev Makes initial validator stakes. Can only be called by the owner
