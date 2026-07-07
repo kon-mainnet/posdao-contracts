@@ -24,9 +24,10 @@
 // What a working live deploy requires (out of scope here — separate PR):
 //   * Separate roles: proxy admin, operational owner (must differ from admin),
 //     and tx signer(s).
-//   * Initialize each proxy via `upgradeToAndCall(impl, initCalldata)` from the
-//     admin (an admin-only path that bypasses the fallback block), passing an
-//     operational owner distinct from the admin.
+//   * Initialize through `upgradeToAndCall(impl, initCalldata)` from the admin
+//     rather than through the proxy fallback.
+//   * For issue2-affected owner-managed contracts, the initCalldata must pass
+//     an operational owner distinct from the proxy admin.
 //   * Send onlyOwner setup calls from the operational-owner key, not the admin.
 //
 // The audit-scope initialization path is genesis + InitializerAuRa (block.number == 0),
