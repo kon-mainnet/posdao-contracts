@@ -164,7 +164,7 @@ operational owner to differ from the proxy admin, which a single-key setup canno
 satisfy. This script is retained for historical reference only.
 
 A working **live redeploy** (as opposed to genesis) is out of scope for the issue2
-PR and will be handled separately. It requires distinct proxy-admin /
+change and will be handled separately. It requires distinct proxy-admin /
 operational-owner / signer roles. The admin must initialize through
 `upgradeToAndCall(impl, initCalldata)` rather than the proxy fallback, and the
 initCalldata for the issue2-affected owner-managed contracts must include an
@@ -173,6 +173,10 @@ operational owner distinct from the proxy admin.
 ## Security Audit
 
 - [Code Assessment of the POSDAO Smart Contracts](https://github.com/poanetwork/posdao-contracts/blob/master/audit/ChainSecurity/report.pdf) by ChainSecurity
+
+### CertiK INI-01 Legacy Platform Risk
+
+INI-01 is treated as an acknowledged legacy platform risk, not as a short-term source-code patch item. See [`audit/CertiK/INI-01-legacy-risk.md`](audit/CertiK/INI-01-legacy-risk.md).
 
 ## Contributing
 
