@@ -19,3 +19,10 @@ node_modules
 
 # Vim backups
 .*.sw[po]
+
+# Local env and generated evidence output (do not commit secrets or on-chain reports)
+.env
+.env.*
+!.env.example
+reports/
+docs/generated/
