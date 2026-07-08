@@ -8,6 +8,18 @@
  *   - It does NOT re-initialize an already-initialized proxy.
  *   - It does NOT change proxy admin or transfer ownership of existing contracts.
  *
+ * SIGNING MODEL (private-key raw transactions):
+ * - This script signs and sends RAW transactions using private keys from the environment.
+ *   It does NOT rely on a node keystore, unlocked accounts, or provider-managed accounts.
+ *   Any plain HTTP RPC endpoint (e.g. https://testkonet.de-app.com) is sufficient.
+ *   - KONET_DEPLOYER_PRIVATE_KEY signs the implementation and proxy creation transactions.
+ *   - KONET_PROXY_ADMIN_PRIVATE_KEY signs the upgradeToAndCall (initialize) transactions.
+ *   - The address recovered from each private key MUST equal its declared role address
+ *     (KONET_DEPLOYER / KONET_PROXY_ADMIN); a mismatch aborts.
+ *   - The operational owner does NOT sign anything during deployment; it is only injected as
+ *     the initialize() `_owner` argument. Do NOT provide an operational-owner private key.
+ *   - Private keys and signed raw transactions are NEVER logged.
+ *
  * WARNING:
  * - Do NOT use the proxy admin as the operational owner. They MUST be different addresses.
  * - Do NOT call an implementation initializer through the proxy fallback from the proxy admin.
@@ -19,6 +31,16 @@
  * - Run in DRY-RUN mode first (the default). Real transactions require KONET_EXECUTE=true, and
  *   mainnet execution is blocked unless KONET_ALLOW_MAINNET_EXECUTE=true.
  *
+ * PROXY CONSTRUCTION + INITIALIZATION:
+ *   Each proxy is constructed pointing directly at its REAL implementation, so every proxy exposes
+ *   its real code before any initializer runs. This is required because the fresh POSDAO set has a
+ *   circular init dependency — ValidatorSetAuRa.initialize() calls into the StakingAuRa proxy
+ *   (getDelegatorPoolsLength), and StakingAuRa.initialize() reads ValidatorSetAuRa
+ *   (idByStakingAddress) — so all target proxies must already carry real code. The proxy admin
+ *   then runs `upgradeToAndCall(realImplementation, initCalldata)` to initialize in-place; this
+ *   proxy (BaseUpgradeabilityProxy) accepts an upgrade to the same implementation, so no
+ *   placeholder implementation is needed.
+ *
  * WHY NOT InitializerAuRa:
  *   InitializerAuRa is designed for the GENESIS initialization path (block.number == 0). On a
  *   live testnet (block.number > 0) InitializerAuRa would call each initializer through the proxy
@@ -27,10 +49,14 @@
  *   fails (block.number > 0 AND msg.sender != _admin()). Therefore live fresh deployment does NOT
  *   use InitializerAuRa; the proxy admin runs each initializer via upgradeToAndCall() instead.
  *
- * Run (dry-run, default):
- *   KONET_DEPLOY_MODE=fresh-proxy KONET_EXECUTE=false \
- *   KONET_PROXY_ADMIN=0x... KONET_OPERATIONAL_OWNER=0x... KONET_EXPECTED_CHAIN_ID=... \
- *   npx truffle exec scripts/deploy_for_konet.js --network konet
+ * Run (dry-run, default) — standalone node against a plain HTTP RPC:
+ *   npm run compile
+ *   KONET_RPC_URL=https://testkonet.de-app.com KONET_EXECUTE=false \
+ *   node scripts/deploy_for_konet.js
+ *
+ * Run (dry-run) via truffle exec (still uses KONET_RPC_URL if set; no unlocked account needed):
+ *   KONET_RPC_URL=https://testkonet.de-app.com \
+ *   npx truffle exec scripts/deploy_for_konet.js --network development
  */
 
 'use strict';
@@ -40,7 +66,7 @@ const path = require('path');
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-// Contract set. artifact = truffle artifact name.
+// Contract set. artifact = compiled artifact / truffle artifact name.
 const CONTRACTS = {
   validatorSet: { label: 'ValidatorSetAuRa', artifact: 'ValidatorSetAuRa', proxyEnvOut: 'KONET_VALIDATOR_SET_PROXY', ownerManaged: false },
   blockReward: { label: 'BlockRewardAuRa', artifact: 'BlockRewardAuRa', proxyEnvOut: 'KONET_BLOCK_REWARD_PROXY', ownerManaged: true },
@@ -120,6 +146,27 @@ const INIT_ABI = {
   },
 };
 
+// upgradeToAndCall(address,bytes) ABI fragment (admin-only).
+const UPGRADE_TO_AND_CALL_ABI = {
+  name: 'upgradeToAndCall', type: 'function', payable: true, inputs: [
+    { name: 'newImplementation', type: 'address' },
+    { name: 'data', type: 'bytes' },
+  ],
+};
+
+// AdminUpgradeabilityProxy constructor ABI fragment (address _logic, address _admin).
+const PROXY_CONSTRUCTOR_INPUTS = [
+  { name: '_logic', type: 'address' },
+  { name: '_admin', type: 'address' },
+];
+
+// idByStakingAddress(address) view fragment.
+const ID_BY_STAKING_ABI = {
+  name: 'idByStakingAddress', type: 'function', stateMutability: 'view', inputs: [
+    { name: '', type: 'address' },
+  ], outputs: [{ name: '', type: 'uint256' }],
+};
+
 // -----------------------------------------------------------------------------
 // Env helpers (minimal .env loader, no external dependency; existing env wins).
 // -----------------------------------------------------------------------------
@@ -167,11 +214,54 @@ function readBool(name) {
   return { invalid: raw };
 }
 
+function eqAddr(a, b) {
+  return !!a && !!b && String(a).toLowerCase() === String(b).toLowerCase();
+}
+
+// -----------------------------------------------------------------------------
+// Private-key helpers. NEVER log the key material itself.
+// -----------------------------------------------------------------------------
+function normalizePrivateKey(pk) {
+  if (!pk) {
+    return null;
+  }
+
+  const trimmed = pk.trim();
+  return trimmed.startsWith('0x') ? trimmed : `0x${trimmed}`;
+}
+
+function accountFromPrivateKey(web3, privateKey) {
+  const normalized = normalizePrivateKey(privateKey);
+
+  if (!normalized) {
+    return null;
+  }
+
+  return web3.eth.accounts.privateKeyToAccount(normalized);
+}
+
+function assertPrivateKeyMatchesRole(web3, roleName, expectedAddress, privateKey) {
+  const account = accountFromPrivateKey(web3, privateKey);
+
+  if (!account) {
+    throw new Error(`${roleName} private key is required for execute mode`);
+  }
+
+  if (!eqAddr(account.address, expectedAddress)) {
+    throw new Error(
+      `${roleName} private key address mismatch: expected ${expectedAddress}, got ${account.address}`
+    );
+  }
+
+  return account;
+}
+
 // -----------------------------------------------------------------------------
 // Config
 // -----------------------------------------------------------------------------
 function loadConfig() {
   return {
+    rpcUrl: env('KONET_RPC_URL'),
     deployMode: env('KONET_DEPLOY_MODE') || 'fresh-proxy',
     execute: readBool('KONET_EXECUTE') === true,
     executeRaw: readBool('KONET_EXECUTE'),
@@ -182,6 +272,14 @@ function loadConfig() {
     proxyAdmin: env('KONET_PROXY_ADMIN'),
     operationalOwner: env('KONET_OPERATIONAL_OWNER'),
     deployer: env('KONET_DEPLOYER'),
+
+    // Signing keys (never logged).
+    deployerPrivateKey: env('KONET_DEPLOYER_PRIVATE_KEY'),
+    proxyAdminPrivateKey: env('KONET_PROXY_ADMIN_PRIVATE_KEY'),
+
+    // Gas config.
+    gasPrice: env('KONET_GAS_PRICE'),
+    gasLimitMultiplierBps: env('KONET_GAS_LIMIT_MULTIPLIER_BPS') || '12000',
 
     initialMining: readList('KONET_INITIAL_MINING_ADDRESSES'),
     initialStaking: readList('KONET_INITIAL_STAKING_ADDRESSES'),
@@ -264,6 +362,146 @@ function missingInitInputs(web3, cfg) {
 }
 
 // -----------------------------------------------------------------------------
+// Artifact loading (works under `truffle exec` and standalone node).
+// -----------------------------------------------------------------------------
+function loadArtifact(name) {
+  // eslint-disable-next-line no-undef
+  if (typeof artifacts !== 'undefined' && artifacts.require) {
+    // eslint-disable-next-line no-undef
+    return artifacts.require(name);
+  }
+
+  const artifactPath = path.join(__dirname, '..', 'build', 'contracts', `${name}.json`);
+  if (!fs.existsSync(artifactPath)) {
+    throw new Error(`artifact ${name} not found at ${artifactPath}; run \`npm run compile\` first`);
+  }
+  return JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+}
+
+function normalizeArtifact(artifact) {
+  return {
+    abi: artifact.abi,
+    bytecode: artifact.bytecode || artifact.unlinked_binary,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Raw transaction sender (private-key signed). This is the ONLY write path.
+// Never logs private keys or signed raw transactions.
+// -----------------------------------------------------------------------------
+const nonceTracker = {};
+
+async function nextNonce(web3, address) {
+  const key = address.toLowerCase();
+
+  if (nonceTracker[key] === undefined) {
+    nonceTracker[key] = await web3.eth.getTransactionCount(address, 'pending');
+    return nonceTracker[key];
+  }
+
+  nonceTracker[key] += 1;
+  return nonceTracker[key];
+}
+
+function applyGasMultiplier(cfg, estimatedGas) {
+  const bps = Number(cfg.gasLimitMultiplierBps || '12000');
+  return Math.ceil(Number(estimatedGas) * bps / 10000);
+}
+
+async function sendSignedTransaction(web3, cfg, account, tx, label) {
+  const from = account.address;
+  const nonce = await nextNonce(web3, from);
+  const gasPrice = cfg.gasPrice || await web3.eth.getGasPrice();
+  const chainId = await web3.eth.getChainId();
+
+  const estimatePayload = {
+    from,
+    data: tx.data,
+    value: tx.value || '0x0',
+  };
+
+  if (tx.to) {
+    estimatePayload.to = tx.to;
+  }
+
+  const estimatedGas = await web3.eth.estimateGas(estimatePayload);
+  const gas = applyGasMultiplier(cfg, estimatedGas);
+
+  const signPayload = {
+    from,
+    data: tx.data,
+    value: tx.value || '0x0',
+    gas,
+    gasPrice,
+    nonce,
+    chainId,
+  };
+
+  if (tx.to) {
+    signPayload.to = tx.to;
+  }
+
+  console.log(`[tx] ${label}`);
+  console.log(`  from: ${from}`);
+  console.log(`  to: ${tx.to || '<contract creation>'}`);
+  console.log(`  gas estimate: ${estimatedGas}`);
+  console.log(`  gas limit: ${gas}`);
+  console.log(`  gas price: ${gasPrice}`);
+  console.log(`  nonce: ${nonce}`);
+
+  const signed = await account.signTransaction(signPayload);
+  const receipt = await web3.eth.sendSignedTransaction(signed.rawTransaction);
+
+  console.log(`  tx hash: ${receipt.transactionHash}`);
+  console.log(`  gas used: ${receipt.gasUsed}`);
+
+  return {
+    label,
+    transactionHash: receipt.transactionHash,
+    contractAddress: receipt.contractAddress || null,
+    gasUsed: receipt.gasUsed,
+    status: receipt.status,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Deployment primitives (raw tx)
+// -----------------------------------------------------------------------------
+async function deployContract(web3, cfg, deployerAccount, artifact, args, label) {
+  const normalized = normalizeArtifact(artifact);
+
+  if (!normalized.bytecode || normalized.bytecode === '0x') {
+    throw new Error(`${label} bytecode is empty`);
+  }
+
+  const contract = new web3.eth.Contract(normalized.abi);
+  const data = contract.deploy({
+    data: normalized.bytecode,
+    arguments: args || [],
+  }).encodeABI();
+
+  const receipt = await sendSignedTransaction(web3, cfg, deployerAccount, { data }, label);
+
+  if (!receipt.contractAddress) {
+    throw new Error(`${label} deployment did not return contractAddress`);
+  }
+
+  return {
+    address: receipt.contractAddress,
+    receipt,
+  };
+}
+
+async function callUpgradeToAndCall(web3, cfg, proxyAdminAccount, proxyAddress, implementationAddress, initCalldata, label) {
+  const data = web3.eth.abi.encodeFunctionCall(UPGRADE_TO_AND_CALL_ABI, [implementationAddress, initCalldata]);
+
+  return sendSignedTransaction(web3, cfg, proxyAdminAccount, {
+    to: proxyAddress,
+    data,
+  }, `${label} upgradeToAndCall`);
+}
+
+// -----------------------------------------------------------------------------
 // Calldata (built at execute time, once proxy addresses are known)
 // -----------------------------------------------------------------------------
 function buildInitCalldata(web3, key, proxies, ids, cfg) {
@@ -314,9 +552,10 @@ function printPlan(cfg, chainId) {
   console.log('KONET fresh-proxy deployment plan');
   line();
   console.log(`Deploy mode        : ${cfg.deployMode}`);
+  console.log(`RPC URL            : ${cfg.rpcUrl || '(truffle provider; no KONET_RPC_URL)'}`);
   console.log(`Chain id           : ${chainId}${cfg.expectedChainId ? ' (expected ' + cfg.expectedChainId + ')' : ''}`);
   console.log(`Mode               : ${cfg.execute ? 'EXECUTE (real transactions requested)' : 'DRY-RUN (no transactions)'}`);
-  console.log(`Deployer / signer  : ${cfg.deployer || '(truffle default account[0])'}`);
+  console.log(`Deployer / signer  : ${cfg.deployer || '(unset)'}`);
   console.log(`Proxy admin        : ${cfg.proxyAdmin || '(unset)'}`);
   console.log(`Operational owner  : ${cfg.operationalOwner || '(unset)'}`);
   console.log(`Mining addresses   : ${cfg.initialMining ? cfg.initialMining.length : 0}`);
@@ -325,10 +564,40 @@ function printPlan(cfg, chainId) {
   console.log(`Initialize order   : ${INIT_ORDER.map(k => CONTRACTS[k].label).join(' -> ')}`);
 }
 
+// Reports signer-key status without ever printing the key material.
+function reportSignerKeys(web3, cfg) {
+  line();
+  console.log('Signer keys (private-key raw-transaction signing):');
+
+  function reportOne(roleName, expectedAddress, privateKey) {
+    if (!privateKey) {
+      console.log(`  ${roleName}: private key NOT provided (required for execute mode)`);
+      return;
+    }
+    let account;
+    try {
+      account = accountFromPrivateKey(web3, privateKey);
+    } catch (e) {
+      console.log(`  ${roleName}: private key present but invalid (${e.message})`);
+      return;
+    }
+    if (!expectedAddress) {
+      console.log(`  ${roleName}: private key present; recovered ${account.address} (role address unset)`);
+      return;
+    }
+    const match = eqAddr(account.address, expectedAddress);
+    console.log(`  ${roleName}: private key present; address ${match ? 'MATCHES' : 'MISMATCH vs'} role ${expectedAddress}`);
+  }
+
+  reportOne('KONET_DEPLOYER', cfg.deployer, cfg.deployerPrivateKey);
+  reportOne('KONET_PROXY_ADMIN', cfg.proxyAdmin, cfg.proxyAdminPrivateKey);
+  console.log('  (KONET_OPERATIONAL_OWNER does not sign during deployment; no private key needed)');
+}
+
 // -----------------------------------------------------------------------------
-// Execute-mode gate (throws on any failure)
+// Execute-mode gate (throws on any failure). Returns the signing accounts.
 // -----------------------------------------------------------------------------
-async function assertExecuteAllowed(web3, cfg, chainId, accounts) {
+async function assertExecuteAllowed(web3, cfg, chainId) {
   const errors = [];
 
   if (cfg.deployMode !== 'fresh-proxy') {
@@ -349,19 +618,23 @@ async function assertExecuteAllowed(web3, cfg, chainId, accounts) {
   }
 
   validateRoles(web3, cfg, errors);
+  if (!cfg.deployer) errors.push('KONET_DEPLOYER not set (required for execute mode)');
   for (const m of missingInitInputs(web3, cfg)) errors.push(`missing init input: ${m}`);
 
-  // Signer availability: the deployer and (critically) the proxy admin must be signable by the
-  // provider, because upgradeToAndCall must be sent FROM the proxy admin.
-  const lc = accounts.map(a => a.toLowerCase());
-  const deployer = cfg.deployer || accounts[0];
-  if (!deployer) errors.push('no deployer account available (set KONET_DEPLOYER or provide a funded account[0])');
-  else if (cfg.deployer && !lc.includes(cfg.deployer.toLowerCase())) {
-    errors.push(`KONET_DEPLOYER ${cfg.deployer} is not in the provider accounts; the provider cannot sign for it`);
+  // Private-key signing: the deployer and proxy admin keys must be present and must recover to
+  // their declared role addresses. No node keystore / unlocked account is used or required.
+  const deployerAccount = accountFromPrivateKey(web3, cfg.deployerPrivateKey);
+  if (!deployerAccount) {
+    errors.push('KONET_DEPLOYER_PRIVATE_KEY is required for execute mode');
+  } else if (cfg.deployer && !eqAddr(deployerAccount.address, cfg.deployer)) {
+    errors.push(`KONET_DEPLOYER_PRIVATE_KEY address mismatch: expected ${cfg.deployer}, got ${deployerAccount.address}`);
   }
-  if (cfg.proxyAdmin && !lc.includes(cfg.proxyAdmin.toLowerCase())) {
-    errors.push(`KONET_PROXY_ADMIN ${cfg.proxyAdmin} is not in the provider accounts; it cannot send upgradeToAndCall. ` +
-      'Provide a provider/unlocked account for the proxy admin.');
+
+  const proxyAdminAccount = accountFromPrivateKey(web3, cfg.proxyAdminPrivateKey);
+  if (!proxyAdminAccount) {
+    errors.push('KONET_PROXY_ADMIN_PRIVATE_KEY is required for execute mode');
+  } else if (cfg.proxyAdmin && !eqAddr(proxyAdminAccount.address, cfg.proxyAdmin)) {
+    errors.push(`KONET_PROXY_ADMIN_PRIVATE_KEY address mismatch: expected ${cfg.proxyAdmin}, got ${proxyAdminAccount.address}`);
   }
 
   if (errors.length) {
@@ -370,51 +643,76 @@ async function assertExecuteAllowed(web3, cfg, chainId, accounts) {
     for (const e of errors) console.log(`  x ${e}`);
     throw new Error(`Execute preconditions failed with ${errors.length} error(s).`);
   }
-  return { deployer };
+
+  // Defensive re-check via the throwing helper (addresses are already validated above).
+  return {
+    deployerAccount: assertPrivateKeyMatchesRole(web3, 'KONET_DEPLOYER', cfg.deployer, cfg.deployerPrivateKey),
+    proxyAdminAccount: assertPrivateKeyMatchesRole(web3, 'KONET_PROXY_ADMIN', cfg.proxyAdmin, cfg.proxyAdminPrivateKey),
+  };
 }
 
 // -----------------------------------------------------------------------------
 // Execute: deploy implementations + proxies, initialize via upgradeToAndCall, verify.
 // -----------------------------------------------------------------------------
-async function executeFreshDeploy(web3, cfg, artifactsRef, deployer) {
-  const AdminUpgradeabilityProxy = artifactsRef.require('AdminUpgradeabilityProxy');
+async function executeFreshDeploy(web3, cfg, deployerAccount, proxyAdminAccount) {
+  const proxyArtifact = loadArtifact('AdminUpgradeabilityProxy');
   const artifactFor = {};
   for (const key of DEPLOY_ORDER) {
-    artifactFor[key] = artifactsRef.require(CONTRACTS[key].artifact);
+    artifactFor[key] = loadArtifact(CONTRACTS[key].artifact);
   }
 
   const impls = {};
   const proxies = {};
   const initTx = {};
 
-  // §3.1 implementations
+  // §11.1 implementations (signed by the deployer key)
   line();
-  console.log('Deploying implementations...');
+  console.log('Deploying implementations (signed by deployer key)...');
   for (const key of DEPLOY_ORDER) {
-    const inst = await artifactFor[key].new({ from: deployer });
-    impls[key] = inst.address;
-    console.log(`  ${CONTRACTS[key].label} impl: ${inst.address}`);
+    const dep = await deployContract(web3, cfg, deployerAccount, artifactFor[key], [], `${CONTRACTS[key].label} implementation`);
+    impls[key] = dep.address;
+    console.log(`  ${CONTRACTS[key].label} impl: ${dep.address}`);
   }
 
-  // §3.2 proxies (constructor sets impl + proxy admin; no init calldata here)
+  // §11.2 proxies (constructor: real impl + proxy admin; no init calldata here).
+  // The real implementation is set at construction so every proxy exposes real code before any
+  // initializer runs — required by the circular init dependency between ValidatorSetAuRa and
+  // StakingAuRa (see the header comment). Initialization happens in §11.3 via upgradeToAndCall.
   line();
-  console.log('Deploying proxies (AdminUpgradeabilityProxy)...');
+  console.log('Deploying proxies (AdminUpgradeabilityProxy, constructed with the real implementation)...');
+  const proxyNormalized = normalizeArtifact(proxyArtifact);
+  if (!proxyNormalized.bytecode || proxyNormalized.bytecode === '0x') {
+    throw new Error('AdminUpgradeabilityProxy bytecode is empty');
+  }
   for (const key of DEPLOY_ORDER) {
-    const proxy = await AdminUpgradeabilityProxy.new(impls[key], cfg.proxyAdmin, { from: deployer });
-    proxies[key] = proxy.address;
-    console.log(`  ${CONTRACTS[key].label} proxy: ${proxy.address}`);
+    // Build creation bytecode = proxy bytecode + encoded (realImpl, proxyAdmin).
+    const encodedArgs = web3.eth.abi.encodeParameters(
+      PROXY_CONSTRUCTOR_INPUTS.map(i => i.type),
+      [impls[key], cfg.proxyAdmin]
+    );
+    const data = proxyNormalized.bytecode + encodedArgs.replace(/^0x/, '');
+    const receipt = await sendSignedTransaction(web3, cfg, deployerAccount, { data }, `${CONTRACTS[key].label} proxy`);
+    if (!receipt.contractAddress) {
+      throw new Error(`${CONTRACTS[key].label} proxy deployment did not return contractAddress`);
+    }
+    proxies[key] = receipt.contractAddress;
+    console.log(`  ${CONTRACTS[key].label} proxy: ${receipt.contractAddress}`);
   }
 
-  // §3.3 initialize via admin upgradeToAndCall (same impl, with init calldata)
+  // §11.3 initialize via admin upgradeToAndCall (same real impl + init calldata), signed by proxy admin
   line();
-  console.log('Initializing via proxy admin upgradeToAndCall...');
+  console.log('Initializing via proxy admin upgradeToAndCall (signed by proxy admin key)...');
   for (const key of INIT_ORDER) {
     let ids = [];
     if (key === 'staking') {
-      // _initialIds are NOT guessed: read them from the just-initialized ValidatorSetAuRa.
-      const vs = await artifactFor.validatorSet.at(proxies.validatorSet);
+      // _initialIds are NOT guessed: read them from the just-initialized ValidatorSetAuRa proxy.
+      // The read goes through the proxy fallback (idByStakingAddress lives on the implementation),
+      // so `from` MUST NOT be the proxy admin — the transparent-proxy guard blocks the admin from
+      // the fallback (some RPCs default eth_call `from` to accounts[0]). Use the zero address,
+      // which is guaranteed != admin.
+      const vs = new web3.eth.Contract([ID_BY_STAKING_ABI], proxies.validatorSet);
       for (const stakingAddr of cfg.initialStaking) {
-        const id = await vs.idByStakingAddress(stakingAddr);
+        const id = await vs.methods.idByStakingAddress(stakingAddr).call({ from: ZERO_ADDRESS });
         const idStr = id.toString();
         if (idStr === '0') {
           throw new Error(`idByStakingAddress(${stakingAddr}) == 0 after ValidatorSet init; cannot build StakingAuRa initCalldata`);
@@ -423,14 +721,13 @@ async function executeFreshDeploy(web3, cfg, artifactsRef, deployer) {
       }
     }
     const initCalldata = buildInitCalldata(web3, key, proxies, ids, cfg);
-    const proxyAsAdmin = await AdminUpgradeabilityProxy.at(proxies[key]);
     let receipt;
     try {
-      receipt = await proxyAsAdmin.upgradeToAndCall(impls[key], initCalldata, { from: cfg.proxyAdmin });
+      receipt = await callUpgradeToAndCall(web3, cfg, proxyAdminAccount, proxies[key], impls[key], initCalldata, CONTRACTS[key].label);
     } catch (e) {
       throw new Error(`upgradeToAndCall failed for ${CONTRACTS[key].label} (proxy ${proxies[key]}) from admin ${cfg.proxyAdmin}: ${e.message}`);
     }
-    initTx[key] = receipt.tx || (receipt.receipt && receipt.receipt.transactionHash) || '(unknown)';
+    initTx[key] = receipt.transactionHash;
     console.log(`  ${CONTRACTS[key].label} initialized: tx ${initTx[key]}`);
   }
 
@@ -473,7 +770,8 @@ async function verifyDeploy(web3, cfg, result) {
     console.log(`  ${CONTRACTS[key].label}: ${problems.length ? 'PROBLEM -> ' + problems.join('; ') : 'ok'}`);
   }
   console.log('\nFor full evidence (owner-only eth_call, admin fallback block, code hashes), run:');
-  console.log('  npx truffle exec scripts/inspect_konet_onchain_evidence.js --network konet');
+  console.log('  KONET_RPC_URL=<rpc> node scripts/inspect_konet_onchain_evidence.js');
+  console.log('  (or: npx truffle exec scripts/inspect_konet_onchain_evidence.js --network konet)');
   console.log('  (populate the *_PROXY env vars from the block below first)');
 }
 
@@ -494,7 +792,7 @@ function printOutput(result) {
 // -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
-async function run(web3, artifactsRef) {
+async function run(web3) {
   loadDotEnv();
   const cfg = loadConfig();
 
@@ -523,6 +821,9 @@ async function run(web3, artifactsRef) {
     console.log('Init inputs: all present.');
   }
 
+  // Signer-key status (no secret material is printed).
+  reportSignerKeys(web3, cfg);
+
   // Fresh-proxy: calldata references proxy addresses that do not exist yet in dry-run.
   line();
   console.log('Initialize calldata (fresh-proxy):');
@@ -533,60 +834,66 @@ async function run(web3, artifactsRef) {
   if (!cfg.execute) {
     line();
     console.log('DRY-RUN complete. No transactions were sent. execute mode: false');
-    console.log('Set KONET_EXECUTE=true (with KONET_EXPECTED_CHAIN_ID) to deploy.');
+    console.log('Set KONET_EXECUTE=true (with KONET_EXPECTED_CHAIN_ID and signing keys) to deploy.');
     return { mode: 'dry-run', chainId };
   }
 
   // ---- EXECUTE ----
-  if (!artifactsRef) {
-    throw new Error('fresh-proxy execute requires `truffle exec` (artifacts unavailable in standalone node mode).');
-  }
-  const accounts = await web3.eth.getAccounts();
-  const { deployer } = await assertExecuteAllowed(web3, cfg, chainId, accounts);
-  console.log(`\nExecute gate OK. Deploying as ${deployer} (proxy admin ${cfg.proxyAdmin}).`);
+  const { deployerAccount, proxyAdminAccount } = await assertExecuteAllowed(web3, cfg, chainId);
+  console.log(`\nExecute gate OK. Deploying as ${deployerAccount.address} (proxy admin ${proxyAdminAccount.address}).`);
 
-  const result = await executeFreshDeploy(web3, cfg, artifactsRef, deployer);
+  const result = await executeFreshDeploy(web3, cfg, deployerAccount, proxyAdminAccount);
   await verifyDeploy(web3, cfg, result);
   printOutput(result);
   return { mode: 'execute', chainId, result };
 }
 
 // -----------------------------------------------------------------------------
+// Web3 provider resolution.
+// KONET_RPC_URL (plain HTTP RPC) takes precedence; otherwise fall back to the truffle-injected
+// web3 global. No unlocked/keystore account is ever required — signing is done with private keys.
+// -----------------------------------------------------------------------------
+function resolveWeb3(globalWeb3) {
+  const url = env('KONET_RPC_URL');
+  if (url) {
+    let Web3;
+    try { Web3 = require('web3'); }
+    catch (e) { throw new Error(`KONET_RPC_URL is set but the web3 module is unavailable: ${e.message}`); }
+    // web3 1.x may expose the constructor as Web3 or Web3.default depending on the bundling.
+    const Ctor = Web3.default || Web3;
+    return new Ctor(new Ctor.providers.HttpProvider(url));
+  }
+  if (globalWeb3) return globalWeb3;
+  throw new Error('No web3 available: set KONET_RPC_URL (recommended) or run via `truffle exec`.');
+}
+
+// -----------------------------------------------------------------------------
 // Entry points
 // -----------------------------------------------------------------------------
 
-// truffle exec: `web3` and `artifacts` are injected globals.
+// truffle exec: `web3` and `artifacts` are injected globals. KONET_RPC_URL, if set, still wins.
 module.exports = async function (callback) {
   try {
+    loadDotEnv();
     // eslint-disable-next-line no-undef
-    const w3 = (typeof web3 !== 'undefined') ? web3 : null;
-    // eslint-disable-next-line no-undef
-    const art = (typeof artifacts !== 'undefined') ? artifacts : null;
-    if (!w3) throw new Error('No web3 available. Run via `truffle exec` or set KONET_RPC_URL for a standalone dry-run.');
-    await run(w3, art);
+    const globalWeb3 = (typeof web3 !== 'undefined') ? web3 : null;
+    const web3Instance = resolveWeb3(globalWeb3);
+    await run(web3Instance);
     return callback();
   } catch (err) {
     return callback(err);
   }
 };
 
-// Standalone node: dry-run only (no artifacts, so no deploy). Requires KONET_RPC_URL.
+// Standalone node: requires KONET_RPC_URL. Supports both dry-run and execute (build artifacts
+// are loaded from build/contracts, so run `npm run compile` first).
 if (require.main === module) {
   (async () => {
     loadDotEnv();
-    const url = env('KONET_RPC_URL');
-    if (!url) {
-      console.error('Standalone mode requires KONET_RPC_URL (dry-run only). For execute, use: ' +
-        'npx truffle exec scripts/deploy_for_konet.js --network konet');
-      process.exit(1);
-    }
-    let Web3;
-    try { Web3 = require('web3'); }
-    catch (e) { console.error('Could not require("web3"). Use `truffle exec` instead.'); process.exit(1); }
-    const web3 = new Web3(new Web3.providers.HttpProvider(url));
     try {
-      const out = await run(web3, null);
-      process.exit(out.mode === 'dry-run' ? 0 : 0);
+      const web3Instance = resolveWeb3(null);
+      await run(web3Instance);
+      process.exit(0);
     } catch (err) {
       console.error(err.message || err);
       process.exit(1);
