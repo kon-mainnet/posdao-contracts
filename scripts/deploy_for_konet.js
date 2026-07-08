@@ -775,6 +775,24 @@ async function verifyDeploy(web3, cfg, result) {
   console.log('  (populate the *_PROXY env vars from the block below first)');
 }
 
+// Expected dependency-proxy env vars consumed by the evidence inspector.
+const EXPECTED_PROXY_ENV = [
+  { key: 'certifier', env: 'KONET_EXPECTED_CERTIFIER_PROXY' },
+  { key: 'governance', env: 'KONET_EXPECTED_GOVERNANCE_PROXY' },
+];
+
+// Expected implementation env vars consumed by the evidence inspector.
+// NOTE: ValidatorSetAuRa has no expected-implementation env field, so it is intentionally omitted
+// here (it still appears in the tx-evidence block below).
+const EXPECTED_IMPL_ENV = [
+  { key: 'certifier', env: 'KONET_CERTIFIER_IMPL_EXPECTED' },
+  { key: 'governance', env: 'KONET_GOVERNANCE_IMPL_EXPECTED' },
+  { key: 'random', env: 'KONET_RANDOM_IMPL_EXPECTED' },
+  { key: 'blockReward', env: 'KONET_BLOCK_REWARD_IMPL_EXPECTED' },
+  { key: 'staking', env: 'KONET_STAKING_IMPL_EXPECTED' },
+  { key: 'txPermission', env: 'KONET_TX_PERMISSION_IMPL_EXPECTED' },
+];
+
 function printOutput(result) {
   line();
   console.log('Deployment result:');
@@ -782,10 +800,31 @@ function printOutput(result) {
   for (const key of DEPLOY_ORDER) {
     console.log(`${CONTRACTS[key].label} | ${result.impls[key]} | ${result.proxies[key]} | ${result.initTx[key] || '-'} | deployed`);
   }
+
+  // Ready-to-paste .env blocks (proxy addresses; evidence inspector uses the _PROXY names).
   line();
-  console.log('Copy into your .env (evidence inspector uses the _PROXY names):');
+  console.log('# Copy proxy addresses into .env');
   for (const key of DEPLOY_ORDER) {
     console.log(`${CONTRACTS[key].proxyEnvOut}=${result.proxies[key]}`);
+  }
+
+  line();
+  console.log('# Copy expected dependency proxies into .env');
+  for (const { key, env: name } of EXPECTED_PROXY_ENV) {
+    console.log(`${name}=${result.proxies[key]}`);
+  }
+
+  line();
+  console.log('# Copy expected implementation addresses into .env');
+  for (const { key, env: name } of EXPECTED_IMPL_ENV) {
+    console.log(`${name}=${result.impls[key]}`);
+  }
+
+  // Init tx hashes are evidence only (not env vars); printed for the record.
+  line();
+  console.log('# Deployment tx evidence');
+  for (const key of DEPLOY_ORDER) {
+    console.log(`${CONTRACTS[key].label}_INIT_TX=${result.initTx[key] || '-'}`);
   }
 }
 
